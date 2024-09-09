@@ -1,7 +1,6 @@
 package router
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,7 +20,7 @@ func TestRouter_Get(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Error("response code is not 200")
+		t.Errorf("response code is: %d, expected: %d", w.Code, http.StatusOK)
 	}
 }
 
@@ -39,7 +38,7 @@ func TestRouter_GetMux(t *testing.T) {
 	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Error("response code is not 200")
+		t.Errorf("response code is: %d, expected: %d", w.Code, http.StatusOK)
 	}
 }
 
@@ -60,11 +59,11 @@ func TestRouter_GetWithParam(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Error("response code is not 200")
+		t.Errorf("response code is: %d, expected: %d", w.Code, http.StatusOK)
 	}
 
 	if w.Body.String() != "test-value" {
-		t.Error("response body is not 'test-value'")
+		t.Errorf("response body is: %s, expected: %s", w.Body.String(), "test-value")
 	}
 }
 
@@ -89,11 +88,11 @@ func TestRouter_GetWithMiddleware(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Error("response code is not 200")
+		t.Errorf("response code is: %d, expected: %d", w.Code, http.StatusOK)
 	}
 
 	if w.Header().Get("X-Test") != "test" {
-		t.Error("response header X-Test is not 'test'")
+		t.Errorf("response header X-Test is: %s, expected: %s", w.Header().Get("X-Test"), "test")
 	}
 }
 
@@ -120,16 +119,12 @@ func TestRouter_GetWithGroup(t *testing.T) {
 
 	r.ServeHTTP(w, req)
 
-	for _, r := range r.GetRoutes() {
-		fmt.Printf("route: %s %s\n", r.Method, r.Path)
-	}
-
 	if w.Code != http.StatusOK {
-		t.Error("response code is not 200")
+		t.Errorf("response code is: %d, expected: %d", w.Code, http.StatusOK)
 	}
 
 	if w.Header().Get("X-Test") != "test" {
-		t.Error("response header X-Test is not 'test'")
+		t.Errorf("response header X-Test is: %s, expected: %s", w.Header().Get("X-Test"), "test")
 	}
 }
 
@@ -164,63 +159,15 @@ func TestRouter_OptionsWithMultipleMiddleware(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNotFound {
-		t.Error("response code is not 404")
+		t.Errorf("response code is: %d, expected: %d", w.Code, http.StatusNotFound)
 	}
 
 	if w.Header().Get("X-Test") != "test" {
-		t.Error("response header X-Test is not 'test'")
+		t.Errorf("response header X-Test is: %s, expected: %s", w.Header().Get("X-Test"), "test")
 	}
 
 	if w.Header().Get("X-Test-2") != "test-2" {
-		t.Error("response header X-Test-2 is not 'test-2'")
-	}
-}
-
-func TestRouter_Static(t *testing.T) {
-
-	req, _ := http.NewRequest("GET", "/test.txt", nil)
-	w := httptest.NewRecorder()
-
-	r := New()
-
-	r.Static("/", "./testdata")
-
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Error("response code is not 200")
-	}
-
-	if w.Header().Get("Content-Type") != "text/plain; charset=utf-8" {
-		t.Error("response content type is not text/plain")
-	}
-
-	if w.Body.String() != "hello world" {
-		t.Error("response body is not 'hello world'")
-	}
-}
-
-func TestRouter_StaticWithPath(t *testing.T) {
-
-	req, _ := http.NewRequest("GET", "/files/test.txt", nil)
-	w := httptest.NewRecorder()
-
-	r := New()
-
-	r.Static("/files", "./testdata")
-
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("response code is not 200, got: %d", w.Code)
-	}
-
-	if w.Header().Get("Content-Type") != "text/plain; charset=utf-8" {
-		t.Error("response content type is not text/plain")
-	}
-
-	if w.Body.String() != "hello world" {
-		t.Error("response body is not 'hello world'")
+		t.Errorf("response header X-Test-2 is: %s, expected: %s", w.Header().Get("X-Test-2"), "test-2")
 	}
 }
 
@@ -228,27 +175,26 @@ func TestRouter_NodeOrder(t *testing.T) {
 
 	r := New()
 
-	r.Static("/files", "./testdata")
-
 	r.Get("/:param", func(w http.ResponseWriter, r *http.Request) {})
+	r.Get("/*catchall", func(w http.ResponseWriter, r *http.Request) {})
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {})
 
 	routes := r.GetRoutes()
 
 	if routes[0].Path != "/test" {
-		t.Error("first route is not '/test', but ", routes[0].Path)
+		t.Errorf("first route '%s', expected: '%s'", routes[0].Path, "/test")
 	}
 
 	if routes[1].Path != "/:param" {
-		t.Error("second route is not '/:param', but ", routes[1].Path)
+		t.Errorf("second route '%s', expected: '%s'", routes[1].Path, "/:param")
 	}
 
-	if routes[2].Path != "/files*" {
-		t.Error("third route is not '/files*', but ", routes[2].Path)
+	if routes[2].Path != "/*catchall" {
+		t.Errorf("third route '%s', expected: '%s'", routes[2].Path, "/*catchall")
 	}
 }
 
-func BenchmarkFib10(b *testing.B) {
+func BenchmarkGet_SingleRoot(b *testing.B) {
 
 	req, _ := http.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -259,7 +205,6 @@ func BenchmarkFib10(b *testing.B) {
 		w.WriteHeader(200)
 	})
 
-	// run the Fib function b.N times
 	for n := 0; n < b.N; n++ {
 		r.ServeHTTP(w, req)
 	}

@@ -1,0 +1,208 @@
+package middleware
+
+import (
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/ironfang-ltd/go-router"
+)
+
+type CorsOption func(*CorsOptions)
+
+type CorsOptions struct {
+	AllowedOrigins   []string
+	AllowedMethods   []string
+	AllowedHeaders   []string
+	AllowCredentials bool
+	ExposedHeaders   []string
+	MaxAge           int
+}
+
+func WithAllowedOrigins(origins ...string) func(*CorsOptions) {
+	return func(opts *CorsOptions) {
+		opts.AllowedOrigins = origins
+	}
+}
+
+func WithAllowedMethods(methods ...string) func(*CorsOptions) {
+	return func(opts *CorsOptions) {
+		opts.AllowedMethods = methods
+	}
+}
+
+func WithAllowedHeaders(headers ...string) func(*CorsOptions) {
+	return func(opts *CorsOptions) {
+		opts.AllowedHeaders = headers
+	}
+}
+
+func WithAllowCredentials(allow bool) func(*CorsOptions) {
+	return func(opts *CorsOptions) {
+		opts.AllowCredentials = allow
+	}
+}
+
+func Cors(options ...CorsOption) router.Middleware {
+
+	opts := &CorsOptions{
+		AllowedOrigins:   []string{},
+		AllowedMethods:   []string{"HEAD", "OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowedHeaders:   []string{},
+		AllowCredentials: false,
+		ExposedHeaders:   []string{},
+		MaxAge:           600,
+	}
+
+	for _, option := range options {
+		option(opts)
+	}
+
+	allowedHeaders := strings.Join(opts.AllowedHeaders, ", ")
+	exposedHeaders := strings.Join(opts.ExposedHeaders, ", ")
+
+	isPreflightRequest := func(r *http.Request) bool {
+		return r.Header.Get("Origin") != "" && r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != ""
+	}
+
+	handlePreflightRequest := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Access-Control-Request-Method")
+		w.Header().Add("Vary", "Access-Control-Request-Headers")
+
+		origin := r.Header.Get("Origin")
+
+		// Check if the origin is allowed
+		if !isOriginAllowed(opts.AllowedOrigins, origin) {
+			return
+		}
+
+		// Check if the method is allowed
+		if !isMethodAllowed(opts.AllowedMethods, r.Header.Get("Access-Control-Request-Method")) {
+			return
+		}
+
+		// Check if the headers are allowed
+		if !isHeadersAllowed(opts.AllowedHeaders, r.Header.Get("Access-Control-Request-Headers")) {
+			return
+		}
+
+		// Set the allowed origin
+		if len(opts.AllowedOrigins) > 0 {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
+
+		// Set the allowed method
+		w.Header().Set("Access-Control-Allow-Methods", strings.ToUpper(r.Header.Get("Access-Control-Request-Method")))
+
+		// Set the allowed headers if set
+		if len(opts.AllowedHeaders) > 0 {
+			w.Header().Set("Access-Control-Allow-Headers", allowedHeaders)
+		}
+
+		// Check if allow credentials is set
+		if opts.AllowCredentials {
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+
+		// Set the max age header if set
+		if opts.MaxAge > 0 {
+			w.Header().Set("Access-Control-Max-Age", strconv.Itoa(opts.MaxAge))
+		}
+	}
+
+	handleRequest := func(w http.ResponseWriter, r *http.Request) {
+
+		origin := r.Header.Get("Origin")
+
+		// Check if the origin is allowed
+		if !isOriginAllowed(opts.AllowedOrigins, origin) {
+			return
+		}
+
+		// Check if the method is allowed
+		if !isMethodAllowed(opts.AllowedMethods, r.Method) {
+			return
+		}
+
+		// Set the allowed origin
+		if len(opts.AllowedOrigins) > 0 {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
+
+		// Set the exposed headers
+		if len(opts.ExposedHeaders) > 0 {
+			w.Header().Add("Access-Control-Expose-Headers", exposedHeaders)
+		}
+
+		// Check if allow credentials is set and set it
+		if opts.AllowCredentials {
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+	}
+
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+
+			w.Header().Add("Vary", "Origin")
+
+			if isPreflightRequest(r) {
+				handlePreflightRequest(w, r)
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			handleRequest(w, r)
+			next(w, r)
+		}
+	}
+}
+
+func isOriginAllowed(origins []string, requestedOrigin string) bool {
+	if len(origins) == 0 {
+		return true
+	}
+
+	if requestedOrigin == "" {
+		return false
+	}
+
+	for _, origin := range origins {
+		if requestedOrigin == origin {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isHeadersAllowed(headers []string, requestedHeaders string) bool {
+	if len(headers) == 0 {
+		return true
+	}
+
+	for _, header := range headers {
+		if requestedHeaders == header {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isMethodAllowed(methods []string, requestedMethod string) bool {
+	if len(methods) == 0 {
+		return true
+	}
+
+	for _, method := range methods {
+		if requestedMethod == method {
+			return true
+		}
+	}
+
+	return false
+}

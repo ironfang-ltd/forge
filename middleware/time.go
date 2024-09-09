@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ironfang-ltd/forge/router"
+	"github.com/ironfang-ltd/go-router"
 )
 
 type customWriter struct {

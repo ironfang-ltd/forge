@@ -92,7 +92,7 @@ func (r *routeTreeNode) GetOrCreateNode(path string) *routeTreeNode {
 			newNode.segment = segment
 			newNode.parent = node
 			newNode.param = segment[0] == ':'
-			newNode.catchAll = segment[len(segment)-1] == '*'
+			newNode.catchAll = segment[0] == '*'
 
 			node.children = append(node.children, newNode)
 
