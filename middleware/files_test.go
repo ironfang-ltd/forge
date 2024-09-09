@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestFiles_WithDefaults(t *testing.T) {
+func TestFiles(t *testing.T) {
 
 	req, err := http.NewRequest("GET", "/test.txt", nil)
 	if err != nil {

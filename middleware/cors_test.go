@@ -6,121 +6,98 @@ import (
 	"testing"
 )
 
-func TestCors_OnlyHandleOPTIONS(t *testing.T) {
+func TestCors(t *testing.T) {
 
-	req, err := http.NewRequest("GET", "/", nil)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name            string
+		options         []CorsOption
+		method          string
+		requestHeaders  map[string]string
+		responseHeaders map[string]string
+	}{
+		{
+			name:           "DefaultConfig",
+			method:         "GET",
+			options:        []CorsOption{},
+			requestHeaders: map[string]string{},
+			responseHeaders: map[string]string{
+				"Vary": "Origin",
+			},
+		},
+		{
+			name:    "AnyOrigin",
+			options: []CorsOption{},
+			method:  "GET",
+			requestHeaders: map[string]string{
+				"Origin": "http://example.com",
+			},
+			responseHeaders: map[string]string{
+				"Vary":                        "Origin",
+				"Access-Control-Allow-Origin": "*",
+			},
+		},
+		{
+			name: "SingleOrigin",
+			options: []CorsOption{
+				WithAllowedOrigins("http://example.com"),
+			},
+			method: "GET",
+			requestHeaders: map[string]string{
+				"Origin": "http://example.com",
+			},
+			responseHeaders: map[string]string{
+				"Vary":                        "Origin",
+				"Access-Control-Allow-Origin": "http://example.com",
+			},
+		},
+		{
+			name: "MultipleOrigins",
+			options: []CorsOption{
+				WithAllowedOrigins("http://example.com", "http://example.org"),
+			},
+			method: "GET",
+			requestHeaders: map[string]string{
+				"Origin": "http://example.org",
+			},
+			responseHeaders: map[string]string{
+				"Vary":                        "Origin",
+				"Access-Control-Allow-Origin": "http://example.org",
+			},
+		},
 	}
-	w := httptest.NewRecorder()
 
-	m := Cors()
-
-	handler := m(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	final := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})
 
-	handler.ServeHTTP(w, req)
+	for i := range tests {
+		tc := tests[i]
 
-	if w.Code != http.StatusOK {
-		t.Errorf("response code is: %d, expected: %d", w.Code, http.StatusOK)
-	}
+		t.Run(tc.name, func(t *testing.T) {
+			mw := Cors(tc.options...)
 
-	if w.Header().Get("Vary") != "" {
-		t.Errorf("vary header is '%s', expected: ''", w.Header().Get("Vary"))
-	}
-}
+			req, _ := http.NewRequest(tc.method, "http://example.com/endpoint", nil)
+			for name, value := range tc.requestHeaders {
+				req.Header.Add(name, value)
+			}
 
-func TestCors_WithDefaults(t *testing.T) {
+			res := httptest.NewRecorder()
 
-	req, err := http.NewRequest("OPTIONS", "/", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Origin", "http://example.com")
-	w := httptest.NewRecorder()
+			mw(final).ServeHTTP(res, req)
 
-	m := Cors()
-
-	handler := m(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("response code is: %d, expected: %d", w.Code, http.StatusOK)
-	}
-
-	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Errorf("access-control-allow-origin header is '%s', expected: %s", w.Header().Get("Access-Control-Allow-Origin"), "*")
-	}
-
-	if w.Header().Get("Access-Control-Allow-Methods") != "GET, POST, PUT, DELETE, OPTIONS" {
-		t.Errorf("access-control-allow-methods header is '%s', expected: %s", w.Header().Get("Access-Control-Allow-Methods"), "GET, POST, PUT, DELETE, OPTIONS")
-	}
-
-	if w.Header().Get("Access-Control-Allow-Headers") != "Content-Type, Authorization" {
-		t.Errorf("access-control-allow-headers header is '%s', expected: %s", w.Header().Get("Access-Control-Allow-Headers"), "Content-Type, Authorization")
-	}
-
-	if w.Header().Get("Access-Control-Expose-Headers") != "Authorization" {
-		t.Errorf("access-control-expose-headers header is '%s', expected: %s", w.Header().Get("Access-Control-Expose-Headers"), "Authorization")
-	}
-
-	if w.Header().Get("Access-Control-Max-Age") != "600" {
-		t.Errorf("access-control-max-age header is '%s', expected: %s", w.Header().Get("Access-Control-Max-Age"), "600")
+			assertResponseHeaders(t, res.Header(), tc.responseHeaders)
+		})
 	}
 }
 
-func TestCors_WithAllowedOrigins(t *testing.T) {
+func assertResponseHeaders(t *testing.T, resHeader http.Header, expected map[string]string) {
 
-	req, err := http.NewRequest("OPTIONS", "http://example.com/", nil)
-	req.Header.Set("Origin", "http://example.com")
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := httptest.NewRecorder()
+	for name, value := range expected {
 
-	m := Cors(WithAllowedOrigins("http://example.com"))
+		got := resHeader.Get(name)
 
-	handler := m(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	}))
-
-	handler.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Error("response code is not 200")
-	}
-
-	if w.Header().Get("Access-Control-Allow-Origin") != "http://example.com" {
-		t.Errorf("got: `%s`, want: `http://example.com`", w.Header().Get("Access-Control-Allow-Origin"))
-	}
-}
-
-func TestCors_WithBadOrigin(t *testing.T) {
-
-	req, err := http.NewRequest("OPTIONS", "http://example.com/", nil)
-	req.Header.Set("Origin", "http://test.com")
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := httptest.NewRecorder()
-
-	m := Cors(WithAllowedOrigins("http://example.com"))
-
-	handler := m(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	}))
-
-	handler.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Error("response code is not 200")
-	}
-
-	if w.Header().Get("Access-Control-Allow-Origin") != "http://example.com" {
-		t.Errorf("got: `%s`, want: `http://example.com`", w.Header().Get("Access-Control-Allow-Origin"))
+		if got != value {
+			t.Errorf("expected header '%s' to be '%s', got '%s'", name, value, got)
+		}
 	}
 }

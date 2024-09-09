@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestTime_WithDefaults(t *testing.T) {
+func TestTime(t *testing.T) {
 
 	req, err := http.NewRequest("GET", "/", nil)
 	if err != nil {
