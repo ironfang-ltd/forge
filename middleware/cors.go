@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -73,16 +74,19 @@ func Cors(options ...CorsOption) router.Middleware {
 
 		// Check if the origin is allowed
 		if !isOriginAllowed(opts.AllowedOrigins, origin) {
+			slog.Info("CORS origin not allowed", "origin", origin)
 			return
 		}
 
 		// Check if the method is allowed
 		if !isMethodAllowed(opts.AllowedMethods, r.Header.Get("Access-Control-Request-Method")) {
+			slog.Info("CORS method not allowed", "method", r.Header.Get("Access-Control-Request-Method"))
 			return
 		}
 
 		// Check if the headers are allowed
 		if !isHeadersAllowed(opts.AllowedHeaders, r.Header.Get("Access-Control-Request-Headers")) {
+			slog.Info("CORS headers not allowed", "headers", r.Header.Get("Access-Control-Request-Headers"))
 			return
 		}
 
@@ -118,11 +122,13 @@ func Cors(options ...CorsOption) router.Middleware {
 
 		// Check if the origin is allowed
 		if !isOriginAllowed(opts.AllowedOrigins, origin) {
+			slog.Info("CORS origin not allowed", "origin", origin)
 			return
 		}
 
 		// Check if the method is allowed
 		if !isMethodAllowed(opts.AllowedMethods, r.Method) {
+			slog.Info("CORS method not allowed", "method", r.Method)
 			return
 		}
 
@@ -179,14 +185,18 @@ func isOriginAllowed(origins []string, requestedOrigin string) bool {
 	return false
 }
 
-func isHeadersAllowed(headers []string, requestedHeaders string) bool {
-	if len(headers) == 0 {
+func isHeadersAllowed(allowedHeaders []string, requestedHeaders string) bool {
+	if len(allowedHeaders) == 0 {
 		return true
 	}
 
-	for _, header := range headers {
-		if requestedHeaders == header {
-			return true
+	requested := strings.Split(requestedHeaders, ", ")
+
+	for _, requestedHeader := range requested {
+		for _, allowedHeader := range allowedHeaders {
+			if strings.ToLower(requestedHeader) == allowedHeader {
+				return true
+			}
 		}
 	}
 
