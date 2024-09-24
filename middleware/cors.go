@@ -177,7 +177,7 @@ func isOriginAllowed(origins []string, requestedOrigin string) bool {
 	}
 
 	for _, origin := range origins {
-		if requestedOrigin == origin {
+		if strings.EqualFold(requestedOrigin, origin) {
 			return true
 		}
 	}
@@ -194,7 +194,7 @@ func isHeadersAllowed(allowedHeaders []string, requestedHeaders string) bool {
 
 	for _, requestedHeader := range requested {
 		for _, allowedHeader := range allowedHeaders {
-			if strings.ToLower(requestedHeader) == allowedHeader {
+			if strings.EqualFold(requestedHeader, allowedHeader) {
 				return true
 			}
 		}
@@ -209,7 +209,7 @@ func isMethodAllowed(methods []string, requestedMethod string) bool {
 	}
 
 	for _, method := range methods {
-		if requestedMethod == method {
+		if strings.EqualFold(requestedMethod, method) {
 			return true
 		}
 	}
