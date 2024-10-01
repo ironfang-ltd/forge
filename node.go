@@ -249,12 +249,15 @@ func (r *routeTreeNode) final(w http.ResponseWriter, req *http.Request) {
 
 	if handler == nil {
 
-		if len(r.handlers) == 0 {
-			r.config.MethodNotAllowedHandler(w, req)
+		// If all handlers are nil, then return 404
+		if r.handlers == nil {
+			r.config.NotFoundHandler(w, req)
 			return
 		}
 
-		r.config.NotFoundHandler(w, req)
+		// There are handlers, but not for this method
+		r.config.MethodNotAllowedHandler(w, req)
+
 		return
 	}
 

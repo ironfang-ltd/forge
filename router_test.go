@@ -6,6 +6,20 @@ import (
 	"testing"
 )
 
+func TestRouter_GetWithNoRoutes(t *testing.T) {
+
+	req, _ := http.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+
+	r := New()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("response code is: %d, expected: %d", w.Code, http.StatusNotFound)
+	}
+}
+
 func TestRouter_Get(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", "/", nil)
